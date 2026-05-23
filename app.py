@@ -128,3 +128,28 @@ if uploaded_file:
         st.session_state.index += 1
 
         st.rerun()
+
+import io
+
+# ✅ STOP BUTTON
+if st.button("🛑 Stop Processing"):
+
+    st.session_state.stop = True
+
+
+# ✅ DOWNLOAD SECTION (appears after stop)
+if st.session_state.get("stop", False):
+
+    st.warning("⚠️ Processing stopped. Download your progress below.")
+
+    buffer = io.BytesIO()
+    st.session_state.df.to_excel(buffer, index=False, engine="openpyxl")
+
+    st.download_button(
+        "⬇ Download Progress File",
+        buffer.getvalue(),
+        "partial_output.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.stop()
