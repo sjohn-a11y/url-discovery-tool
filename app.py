@@ -1,17 +1,26 @@
 import streamlit as st
 import pandas as pd
 import json
+import io
 
-st.set_page_config(page_title="Harvester QA Tool", layout="wide")
+st.set_page_config(page_title="URL Discovery Tool", layout="wide")
 
-st.title("🔷 Harvester QA Tool")
+st.title("🔷 URL Discovery Tool")
 
-# ✅ Session
+
+# ✅ Session states
 if "index" not in st.session_state:
     st.session_state.index = 0
 
 if "df" not in st.session_state:
     st.session_state.df = None
+
+if "started" not in st.session_state:
+    st.session_state.started = False
+
+if "stop" not in st.session_state:
+    st.session_state.stop = False
+
 
 uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
@@ -22,29 +31,67 @@ if uploaded_file:
 
     df = st.session_state.df
 
+    # ✅ START & STOP BUTTONS
+    col1, col2 = st.columns(2)
+
+    if col1.button("▶ Start Processing", disabled=st.session_state.started):
+        st.session_state.started = True
+
+    if col2.button("🛑 Stop Processing"):
+        st.session_state.stop = True
+        st.session_state.started = False
+
+    # ✅ STOP + DOWNLOAD
+    if st.session_state.get("stop", False):
+
+        st.warning("⚠️ Processing stopped. Download your progress below.")
+
+        buffer = io.BytesIO()
+        st.session_state.df.to_excel(buffer, index=False, engine="openpyxl")
+
+        st.download_button(
+            "⬇ Download Progress File",
+            buffer.getvalue(),
+            "partial_output.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        st.stop()
+
+    # ✅ WAIT BEFORE START
+    if not st.session_state.started:
+        st.info("👉 Click 'Start Processing' to begin")
+        st.stop()
+
     entity_list = df["Entity ID"].tolist()
 
-    # ✅ All processed
+    # ✅ All completed
     if st.session_state.index >= len(entity_list):
         st.success("✅ All entities completed!")
 
-        output = df.to_csv(index=False).encode("utf-8")
+        buffer = io.BytesIO()
+        df.to_excel(buffer, index=False, engine="openpyxl")
 
         st.download_button(
             "⬇ Download Output File",
-            output,
-            "processed_output.csv",
-            "text/csv"
+            buffer.getvalue(),
+            "processed_output.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
         st.stop()
 
     # ✅ Current entity
     entity_id = entity_list[st.session_state.index]
     row = df[df["Entity ID"] == entity_id].iloc[0]
 
-    st.subheader(f"📌 Entity ID: {entity_id}")
+    # ✅ Clickable Entity ID
+    st.markdown(
+        f'<h3>📌 <a href="https://crawler-admin.consumerism.pressganey.com/#/verify-sources/{entity_id}" target="_blank">Entity ID: {entity_id}</a></h3>',
+        unsafe_allow_html=True
+    )
 
-    # ✅ Extract Entity Name from Payload
+    # ✅ Extract Entity Name
     entity_name = ""
     try:
         payload = json.loads(row["Payload"])
@@ -52,7 +99,7 @@ if uploaded_file:
     except:
         entity_name = "N/A"
 
-    # ✅ TOP DASHBOARD
+    # ✅ DASHBOARD
     st.markdown("### 🧾 Entity Details")
 
     c1, c2, c3 = st.columns(3)
@@ -66,9 +113,9 @@ if uploaded_file:
     c3.write(f"**Client Products:** {row['Client Products']}")
     c3.write(f"**Entity Type:** {row['Entity Type']}")
 
-    # ✅ TRANSPOSE DATA
+    # ✅ TRANSPOSE
     st.markdown("---")
-    st.markdown("### 🔍 Source Details")
+    st.markdown("### 🔍 Error Details")
 
     cols = df.columns.tolist()
 
@@ -82,10 +129,8 @@ if uploaded_file:
     for col in sources:
         val = str(row[col]).strip()
 
-        # ✅ skip blanks
         if val != "" and val.lower() != "nan":
 
-            # ✅ Action logic
             if "404" in val or "No URLs" in val:
                 action = "Add URL"
             elif "500" in val:
@@ -117,8 +162,11 @@ if uploaded_file:
 
     st.write(f"Processing {st.session_state.index + 1} / {len(entity_list)}")
 
-    # ✅ COMPLETED BUTTON
-    if st.button("✅ Completed & Next"):
+    # ✅ ACTION BUTTONS (Completed + Pending)
+    c1, c2 = st.columns(2)
+
+    # ✅ Completed
+    if c1.button("✅ Completed & Next"):
 
         st.session_state.df.loc[
             st.session_state.df["Entity ID"] == entity_id,
@@ -126,30 +174,15 @@ if uploaded_file:
         ] = "Completed"
 
         st.session_state.index += 1
-
         st.rerun()
 
-import io
+    # ✅ 🔥 NEW Pending Button
+    if c2.button("⏳ Mark as Pending & Next"):
 
-# ✅ STOP BUTTON
-if st.button("🛑 Stop Processing"):
+        st.session_state.df.loc[
+            st.session_state.df["Entity ID"] == entity_id,
+            "Status"
+        ] = "Pending"
 
-    st.session_state.stop = True
-
-
-# ✅ DOWNLOAD SECTION (appears after stop)
-if st.session_state.get("stop", False):
-
-    st.warning("⚠️ Processing stopped. Download your progress below.")
-
-    buffer = io.BytesIO()
-    st.session_state.df.to_excel(buffer, index=False, engine="openpyxl")
-
-    st.download_button(
-        "⬇ Download Progress File",
-        buffer.getvalue(),
-        "partial_output.xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    st.stop()
+        st.session_state.index += 1
+        st.rerun()
