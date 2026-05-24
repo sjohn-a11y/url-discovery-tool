@@ -3,6 +3,25 @@ import pandas as pd
 import json
 import io
 
+st.markdown(
+    """
+    <style>
+    .logo-container {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 999;
+    }
+    </style>
+
+    <div class="logo-container">
+        <img src="logo.png" width="50">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
 st.set_page_config(page_title="URL Discovery Tool", layout="wide")
 
 st.title("🔷 URL Discovery Tool")
