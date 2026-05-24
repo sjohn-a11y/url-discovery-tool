@@ -5,7 +5,7 @@ import io
 
 st.set_page_config(page_title="URL Discovery Tool", layout="wide")
 
-st.image("logo.png", width=80)
+st.image("logo.png", width=120)
 st.title("🔷 URL Discovery Tool")
 
 
